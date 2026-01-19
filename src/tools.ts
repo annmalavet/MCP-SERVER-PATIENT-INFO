@@ -195,12 +195,12 @@ registerOnce(
     description: 'Updates specific fields for a patient by ID',
     inputSchema: z.object({
       patientId: z.number().describe('The unique ID of the patient to update'),
-      firstName: z.string().optional().describe('New first name'),
-      lastName: z.string().optional().describe('New last name'),
-      doctorLastName: z.string().optional().describe('New doctor last name'),
-      signedConsent: z.boolean().optional().describe('New consent status'),
-      amountDue: z.number().optional().describe('New amount due'),
-      birthDate: z.string().optional().describe('New DOB (YYYY-MM-DD)'),
+      firstName: z.string().nullable().describe('New first name (or null to keep current)'),
+      lastName: z.string().nullable().describe('New last name (or null to keep current)'),
+      doctorLastName: z.string().nullable().describe('New doctor last name (or null to keep current)'),
+      signedConsent: z.boolean().nullable().describe('New consent status (or null to keep current)'),
+      amountDue: z.number().nullable().describe('New amount due (or null to keep current)'),
+      birthDate: z.string().nullable().describe('New DOB YYYY-MM-DD (or null to keep current)'),
     }),
   },
   async (params: any) => {
