@@ -28,7 +28,7 @@ registerOnce(
   'search_for_patient',
   {
     title: 'Search All Patients',
-    description: 'Searches the clinic patient database by last name. Returns patient ID, name, date of birth, signed consent status, medications, and diagnosis.',
+    description: 'Searches the clinic patient database by last name, first name, doctor, date of birth, or email. Returns patient ID, name, date of birth, signed consent status, medications, and diagnosis.',
     inputSchema: searchDBSchema,
   },
   async (params: any) => {
@@ -41,7 +41,8 @@ registerOnce(
         patient_first_name ILIKE $1 
         OR patient_last_name ILIKE $1 
         OR doctor_last_name ILIKE $1 
-        OR patient_birth_day::TEXT ILIKE $1`;
+        OR patient_birth_day::TEXT ILIKE $1
+        OR email ILIKE $1`;
 
       const values = [`%${query}%`];
       
@@ -53,9 +54,10 @@ registerOnce(
         };
       }
 
-      const formattedResults = result.rows
-        .map((row: { id: any; patient_first_name: any; patient_last_name: any; patient_birth_date: any; signed_consent: any;}) => `ID: ${row.id} - Name: ${row.patient_first_name} ${row.patient_last_name} - Birthday: ${row.patient_birth_date} - Signed Consent: ${row.signed_consent}`)
-        .join('\n');
+      
+  const formattedResults = result.rows
+    .map((row: { id: any; patient_first_name: any; patient_last_name: any; patient_birth_day: any; signed_consent: any; medications: any; diagnosis: any; email: any; }) => `ID: ${row.id} - Name: ${row.patient_first_name} ${row.patient_last_name} - Email: ${row.email} - Birthday: ${row.patient_birth_day} - Signed Consent: ${row.signed_consent} - Medications: ${row.medications} - Diagnosis: ${row.diagnosis}`)
+    .join('\n');
 
       return {
         content: [{ type: 'text', text: formattedResults }],
