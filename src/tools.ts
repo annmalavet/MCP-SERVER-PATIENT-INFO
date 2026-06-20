@@ -40,7 +40,6 @@ registerOnce(
       WHERE 
         patient_first_name ILIKE $1 
         OR patient_last_name ILIKE $1 
-        OR doctor_last_name ILIKE $1 
         OR patient_birth_day::TEXT ILIKE $1
         OR email ILIKE $1`;
 
@@ -54,7 +53,7 @@ registerOnce(
         };
       }
 
-      
+
   const formattedResults = result.rows
     .map((row: { id: any; patient_first_name: any; patient_last_name: any; patient_birth_day: any; signed_consent: any; medications: any; diagnosis: any; email: any; }) => `ID: ${row.id} - Name: ${row.patient_first_name} ${row.patient_last_name} - Email: ${row.email} - Birthday: ${row.patient_birth_day} - Signed Consent: ${row.signed_consent} - Medications: ${row.medications} - Diagnosis: ${row.diagnosis}`)
     .join('\n');
