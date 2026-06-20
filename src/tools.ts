@@ -28,7 +28,7 @@ registerOnce(
   'search_for_patient',
   {
     title: 'Search All Patients',
-    description: 'Searches for last name of patient.',
+    description: 'Searches the clinic patient database by last name. Returns patient ID, name, date of birth, signed consent status, medications, and diagnosis.',
     inputSchema: searchDBSchema,
   },
   async (params: any) => {
@@ -74,7 +74,7 @@ registerOnce(
   'create_new_patient',
   {
     title: 'Create New Patient',
-    description: 'Creates a new patient. Requires Name, DOB YYYY-MM-DD format, and Doctor.',
+    description: 'Creates a new patient record in the clinic database. Requires first name, last name, doctor last name, and date of birth (YYYY-MM-DD). Optional: signedConsent (boolean) and amountDue.',
     inputSchema: z.object({
       firstName: z.string().describe('Patient first name'),
       lastName: z.string().describe('Patient last name'),
@@ -141,7 +141,7 @@ registerOnce(
   'search_consent_status',
   {
     title: 'Search by Consent',
-    description: 'Finds patients based on consent status. Search "false" by default',
+    description: 'Finds clinic patients by signed consent status (pass "true" or "false"). Returns patient ID, name, and consent status. Use this to audit unsigned consent or confirm signed patients.',
     inputSchema: searchDBSchema,
   },
   async (params: any) => {
