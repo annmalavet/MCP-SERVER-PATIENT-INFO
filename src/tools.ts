@@ -41,6 +41,7 @@ registerOnce(
         patient_first_name ILIKE $1 
         OR patient_last_name ILIKE $1 
         OR patient_birth_day::TEXT ILIKE $1
+        OR CONCAT_WS(' ', patient_first_name, patient_last_name) ILIKE $1
         OR email ILIKE $1`;
 
       const values = [`%${query}%`];
