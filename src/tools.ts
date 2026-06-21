@@ -194,27 +194,35 @@ registerOnce(
   'update_patient_info',
   {
     title: 'Update Patient Info',
-    description: 'Updates fields for a patient by patient_id. Provide patient_id (string) and an updates object containing only the fields to change.',
+    description:
+      'Updates one field for a patient by patient_id. Use this after search_for_patient returns a patient_id.',
     inputSchema: z.object({
-      patient_id: z.string().describe('The unique ID of the patient to update (as a string)'),
-      updates: z.object({
-        doctor_last_name: z.string().optional().describe('New doctor last name'),
-        signed_consent: z.boolean().optional().describe('New consent status'),
-        amount_due: z.string().optional().describe('New amount due (e.g. "0.00")'),
-        patient_birth_day: z.string().optional().describe('New DOB YYYY-MM-DD'),
-        social_security_number: z.string().optional().describe('New SSN'),
-        medications: z.string().optional().describe('New medications'),
-        diagnosis: z.string().optional().describe('New diagnosis'),
-        email: z.string().optional().describe('New email address'),
-      }).describe('Fields to update — include only the fields you want to change'),
+      patient_id: z.string().describe('The unique ID of the patient to update'),
+      field: z.enum([
+        'doctor_last_name',
+        'signed_consent',
+        'amount_due',
+        'patient_birth_day',
+        'social_security_number',
+        'medications',
+        'diagnosis',
+        'email',
+      ]).describe('The patient_info field to update'),
+      value: z.string().describe('The new value for the field'),
     }),
   },
   async (params: any) => {
     const pool = new pg.Pool(dbConfig);
 
     try {
-      const patientId = String(params.patient_id || '').trim();
-      const updates: Record<string, any> = params.updates || {};
+      const patientId = String(params.patient_id || '')
+        .trim()
+        .replace(/^['"]+|['"]+$/g, '')
+        .replace(/[,.;:]+$/g, '')
+        .trim();
+
+      const field = String(params.field || '').trim();
+      let value: any = String(params.value ?? '').trim();
 
       const allowedColumns: Record<string, string> = {
         doctor_last_name: 'doctor_last_name',
@@ -227,40 +235,63 @@ registerOnce(
         email: 'email',
       };
 
-      const entries = Object.entries(updates).filter(([field]) => allowedColumns[field] !== undefined);
-
-      if (!patientId || entries.length === 0) {
+      if (!patientId || !allowedColumns[field]) {
         return {
-          content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'MISSING_PATIENT_ID_OR_UPDATES' }) }],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              ok: false,
+              error: 'MISSING_OR_INVALID_PATIENT_ID_OR_FIELD',
+              patient_id: patientId,
+              field,
+            }),
+          }],
           isError: true,
         };
       }
 
-      const setClauses = entries.map(([field], i) => `${allowedColumns[field]} = $${i + 2}`);
-      const values: any[] = [patientId, ...entries.map(([, value]) => value)];
+      if (field === 'signed_consent') {
+        value = value.toLowerCase() === 'true' || value.toLowerCase() === 'signed';
+      }
+
+      if (field === 'medications') {
+        value = [value];
+      }
 
       const sql = `
         UPDATE patient_info
-        SET ${setClauses.join(', ')}
+        SET ${allowedColumns[field]} = $2
         WHERE id = $1
         RETURNING *;
       `;
 
-      const result = await pool.query(sql, values);
+      const result = await pool.query(sql, [patientId, value]);
 
       return {
         content: [{
           type: 'text',
-          text: JSON.stringify({ ok: result.rows.length > 0, patient: result.rows[0] || null }),
+          text: JSON.stringify({
+            ok: result.rows.length > 0,
+            patient: result.rows[0] || null,
+            error: result.rows.length === 0 ? 'PATIENT_NOT_FOUND' : undefined,
+          }),
         }],
+        isError: result.rows.length === 0,
       };
-
     } catch (error: any) {
-      console.error('Database error:', error);
       return {
-        content: [{ type: 'text', text: `Database error: ${error.message}` }],
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: 'DATABASE_ERROR',
+            message: error.message,
+          }),
+        }],
         isError: true,
       };
+    } finally {
+      await pool.end();
     }
   }
 );
