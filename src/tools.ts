@@ -194,71 +194,65 @@ registerOnce(
   'update_patient_info',
   {
     title: 'Update Patient Info',
-    description: 'Updates specific fields for a patient by ID',
+    description: 'Updates fields for a patient by patient_id. Provide patient_id (string) and an updates object containing only the fields to change.',
     inputSchema: z.object({
-      patientId: z.number().describe('The unique ID of the patient to update'),
-      firstName: z.string().nullable().describe('New first name (or null to keep current)'),
-      lastName: z.string().nullable().describe('New last name (or null to keep current)'),
-      doctorLastName: z.string().nullable().describe('New doctor last name (or null to keep current)'),
-      signedConsent: z.boolean().nullable().describe('New consent status (or null to keep current)'),
-      amountDue: z.number().nullable().describe('New amount due (or null to keep current)'),
-      birthDate: z.string().nullable().describe('New DOB YYYY-MM-DD (or null to keep current)'),
+      patient_id: z.string().describe('The unique ID of the patient to update (as a string)'),
+      updates: z.object({
+        doctor_last_name: z.string().optional().describe('New doctor last name'),
+        signed_consent: z.boolean().optional().describe('New consent status'),
+        amount_due: z.string().optional().describe('New amount due (e.g. "0.00")'),
+        patient_birth_day: z.string().optional().describe('New DOB YYYY-MM-DD'),
+        social_security_number: z.string().optional().describe('New SSN'),
+        medications: z.string().optional().describe('New medications'),
+        diagnosis: z.string().optional().describe('New diagnosis'),
+        email: z.string().optional().describe('New email address'),
+      }).describe('Fields to update — include only the fields you want to change'),
     }),
   },
   async (params: any) => {
     const pool = new pg.Pool(dbConfig);
-    
+
     try {
-      const { patientId, ...updates } = params;
+      const patientId = String(params.patient_id || '').trim();
+      const updates: Record<string, any> = params.updates || {};
 
-      if (Object.keys(updates).length === 0) {
-        return {
-          content: [{ type: 'text', text: 'Error: There must be at least one field to change.' }],
-          isError: true
-        };
-      }
-
-      const columnMap: Record<string, string> = {
-        firstName: 'patient_first_name',
-        lastName: 'patient_last_name',
-        doctorLastName: 'doctor_last_name',
-        signedConsent: 'signed_consent',
-        amountDue: 'amount_due',
-        birthDate: 'patient_birth_day'
+      const allowedColumns: Record<string, string> = {
+        doctor_last_name: 'doctor_last_name',
+        signed_consent: 'signed_consent',
+        amount_due: 'amount_due',
+        patient_birth_day: 'patient_birth_day',
+        social_security_number: 'social_security_number',
+        medications: 'medications',
+        diagnosis: 'diagnosis',
+        email: 'email',
       };
 
-      const setClauses: string[] = [];
-      const values: any[] = [];
-      let paramIndex = 1;
+      const entries = Object.entries(updates).filter(([field]) => allowedColumns[field] !== undefined);
 
-      for (const [key, value] of Object.entries(updates)) {
-        if (columnMap[key] && value !== undefined) {
-          setClauses.push(`${columnMap[key]} = $${paramIndex}`);
-          values.push(value);
-          paramIndex++;
-        }
-      }
-
-      const sql = `
-        UPDATE patient_info
-        SET ${setClauses.join(', ')}
-        WHERE id = $${paramIndex}
-        RETURNING *;
-      `;
-      values.push(patientId);
-
-      const result = await pool.query(sql, values);
-
-      if (result.rows.length === 0) {
+      if (!patientId || entries.length === 0) {
         return {
-          content: [{ type: 'text', text: `Error: Patient ID ${patientId} not found.` }],
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'MISSING_PATIENT_ID_OR_UPDATES' }) }],
           isError: true,
         };
       }
 
-      const updatedRow = result.rows[0];
+      const setClauses = entries.map(([field], i) => `${allowedColumns[field]} = $${i + 2}`);
+      const values: any[] = [patientId, ...entries.map(([, value]) => value)];
+
+      const sql = `
+        UPDATE patient_info
+        SET ${setClauses.join(', ')}
+        WHERE id = $1
+        RETURNING *;
+      `;
+
+      const result = await pool.query(sql, values);
+
       return {
-        content: [{ type: 'text', text: `Success: Updated patient ID ${patientId}. New State: ${JSON.stringify(updatedRow)}` }],
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ ok: result.rows.length > 0, patient: result.rows[0] || null }),
+        }],
       };
 
     } catch (error: any) {
